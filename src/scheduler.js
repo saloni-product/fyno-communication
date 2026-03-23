@@ -50,6 +50,8 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
         jobId,
         eventName: fynoConfig.eventName,
         distinctId: fynoConfig.recipient?.distinct_id,
+        name: fynoConfig.data?.name,
+        consultationLink: fynoConfig.data?.consultation_link,
         targetTime: targetTime.toISOString(),
         triggeredAt,
         status: "success",
@@ -61,6 +63,8 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
         jobId,
         eventName: fynoConfig.eventName,
         distinctId: fynoConfig.recipient?.distinct_id,
+        name: fynoConfig.data?.name,
+        consultationLink: fynoConfig.data?.consultation_link,
         targetTime: targetTime.toISOString(),
         triggeredAt,
         status: "failed",
@@ -77,6 +81,8 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
     notifyAt,
     eventName: fynoConfig.eventName,
     distinctId: fynoConfig.recipient?.distinct_id,
+    name: fynoConfig.data?.name,
+    consultationLink: fynoConfig.data?.consultation_link,
   };
 
   console.log(
@@ -103,6 +109,8 @@ function cancelJob(jobId) {
     jobId,
     eventName: entry.eventName,
     distinctId: entry.distinctId,
+    name: entry.name,
+    consultationLink: entry.consultationLink,
     targetTime: entry.targetTime.toISOString(),
     triggeredAt: new Date().toISOString(),
     status: "cancelled",
@@ -116,10 +124,12 @@ function cancelJob(jobId) {
  * List all active scheduled jobs.
  */
 function listJobs() {
-  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt, eventName, distinctId }]) => ({
+  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt, eventName, distinctId, name, consultationLink }]) => ({
     jobId,
     eventName,
     distinctId,
+    name,
+    consultationLink,
     targetTime: targetTime.toISOString(),
     notifyAt: notifyAt.toISOString(),
     status: "scheduled",
