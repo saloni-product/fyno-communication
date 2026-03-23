@@ -44,10 +44,7 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
     const triggeredAt = new Date().toISOString();
     console.log(`[${triggeredAt}] Job ${jobId} triggered — sending Fyno notification`);
     try {
-      await sendFynoNotification({
-        ...fynoConfig,
-        data: { ...fynoConfig.data, booking_time: targetTime.toISOString() },
-      });
+      await sendFynoNotification(fynoConfig);
       console.log(`[${new Date().toISOString()}] Job ${jobId} — Fyno call succeeded`);
       addLog({
         jobId,

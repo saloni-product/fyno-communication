@@ -33,6 +33,24 @@ const PORT = process.env.PORT || 3000;
 // Response:
 // { "jobId": "...", "targetTime": "...", "notifyAt": "...", "status": "scheduled" }
 // ─────────────────────────────────────────────────────────────────────────────
+// Format "2026-03-24T15:00:00+05:30" → "24 Mar 2026"
+function formatBookingDate(isoString) {
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = isoString.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (!m) return isoString;
+  return `${parseInt(m[3])} ${MONTHS[parseInt(m[2]) - 1]} ${m[1]}`;
+}
+
+// Format "2026-03-24T15:00:00+05:30" → "03:00 PM"
+function formatBookingTime(isoString) {
+  const m = isoString.match(/T(\d{2}):(\d{2})/);
+  if (!m) return isoString;
+  const h = parseInt(m[1]);
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = String(h % 12 || 12).padStart(2, "0");
+  return `${h12}:${m[2]} ${ampm}`;
+}
+
 app.post("/schedule", (req, res) => {
   const { timestamp, name, consultation_link, fyno } = req.body;
 
@@ -48,7 +66,13 @@ app.post("/schedule", (req, res) => {
   try {
     const enrichedFyno = {
       ...fyno,
-      data: { name, consultation_link, ...fyno.data },
+      data: {
+        name,
+        consultation_link,
+        booking_date: formatBookingDate(timestamp),
+        booking_time: formatBookingTime(timestamp),
+        ...fyno.data,
+      },
     };
     const result = scheduleHourBeforeNotification(timestamp, enrichedFyno);
     return res.status(201).json(result);
