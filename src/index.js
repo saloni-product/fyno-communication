@@ -13,7 +13,9 @@ const PORT = process.env.PORT || 3000;
 //
 // Request body:
 // {
-//   "timestamp": "2026-03-21T10:00:00+00:00",   // ISO 8601, must be >1h from now
+//   "timestamp":         "2026-03-21T10:00:00+00:00",  // ISO 8601, must be >1h from now
+//   "name":              "John Doe",                    // passed to message template
+//   "consultation_link": "https://meet.example.com/x", // passed to message template
 //   "fyno": {
 //     "apiKey":      "YOUR_FYNO_API_KEY",
 //     "workspaceId": "YOUR_WORKSPACE_ID",
@@ -24,7 +26,7 @@ const PORT = process.env.PORT || 3000;
 //       "sms":         "+1234567890",         // optional
 //       "whatsapp":    "+1234567890"          // optional
 //     },
-//     "data": { "key": "value" }              // optional template variables
+//     "data": { "key": "value" }              // optional extra template variables
 //   }
 // }
 //
@@ -32,7 +34,7 @@ const PORT = process.env.PORT || 3000;
 // { "jobId": "...", "targetTime": "...", "notifyAt": "...", "status": "scheduled" }
 // ─────────────────────────────────────────────────────────────────────────────
 app.post("/schedule", (req, res) => {
-  const { timestamp, fyno } = req.body;
+  const { timestamp, name, consultation_link, fyno } = req.body;
 
   if (!timestamp) {
     return res.status(400).json({ error: "timestamp is required" });
@@ -44,7 +46,11 @@ app.post("/schedule", (req, res) => {
   }
 
   try {
-    const result = scheduleHourBeforeNotification(timestamp, fyno);
+    const enrichedFyno = {
+      ...fyno,
+      data: { name, consultation_link, ...fyno.data },
+    };
+    const result = scheduleHourBeforeNotification(timestamp, enrichedFyno);
     return res.status(201).json(result);
   } catch (err) {
     return res.status(400).json({ error: err.message });
