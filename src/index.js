@@ -21,10 +21,9 @@ const PORT = process.env.PORT || 3000;
 //     "workspaceId": "YOUR_WORKSPACE_ID",
 //     "eventName":   "your_event_name",
 //     "recipient": {
-//       "distinct_id": "user_123",
-//       "email":       "user@example.com",   // optional
-//       "sms":         "+1234567890",         // optional
-//       "whatsapp":    "+1234567890"          // optional
+//       "whatsapp": "+917757855472",          // optional
+//       "sms":      "+1234567890",            // optional
+//       "email":    "user@example.com"        // optional
 //     },
 //     "data": { "key": "value" }              // optional extra template variables
 //   }

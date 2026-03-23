@@ -49,7 +49,7 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
       addLog({
         jobId,
         eventName: fynoConfig.eventName,
-        distinctId: fynoConfig.recipient?.distinct_id,
+        whatsapp: fynoConfig.recipient?.whatsapp,
         name: fynoConfig.data?.name,
         consultationLink: fynoConfig.data?.consultation_link,
         targetTime: targetTime.toISOString(),
@@ -62,7 +62,7 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
       addLog({
         jobId,
         eventName: fynoConfig.eventName,
-        distinctId: fynoConfig.recipient?.distinct_id,
+        whatsapp: fynoConfig.recipient?.whatsapp,
         name: fynoConfig.data?.name,
         consultationLink: fynoConfig.data?.consultation_link,
         targetTime: targetTime.toISOString(),
@@ -80,7 +80,7 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
     targetTime,
     notifyAt,
     eventName: fynoConfig.eventName,
-    distinctId: fynoConfig.recipient?.distinct_id,
+    whatsapp: fynoConfig.recipient?.whatsapp,
     name: fynoConfig.data?.name,
     consultationLink: fynoConfig.data?.consultation_link,
   };
@@ -108,7 +108,7 @@ function cancelJob(jobId) {
   addLog({
     jobId,
     eventName: entry.eventName,
-    distinctId: entry.distinctId,
+    whatsapp: entry.whatsapp,
     name: entry.name,
     consultationLink: entry.consultationLink,
     targetTime: entry.targetTime.toISOString(),
@@ -124,10 +124,10 @@ function cancelJob(jobId) {
  * List all active scheduled jobs.
  */
 function listJobs() {
-  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt, eventName, distinctId, name, consultationLink }]) => ({
+  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt, eventName, whatsapp, name, consultationLink }]) => ({
     jobId,
     eventName,
-    distinctId,
+    whatsapp,
     name,
     consultationLink,
     targetTime: targetTime.toISOString(),
@@ -158,16 +158,14 @@ async function sendFynoNotification(fynoConfig) {
 
   const url = `https://api.fyno.io/v1/${workspaceId}/event`;
 
+  const to = {};
+  if (recipient.whatsapp) to.whatsapp = recipient.whatsapp;
+  if (recipient.sms) to.sms = recipient.sms;
+  if (recipient.email) to.email = recipient.email;
+
   const payload = {
     event: eventName,
-    to: {
-      distinct_id: recipient.distinct_id,
-      // Optional channel-specific identifiers
-      ...(recipient.email && { email: [{ channel: "email", address: recipient.email }] }),
-      ...(recipient.sms && { sms: [{ channel: "sms", number: recipient.sms }] }),
-      ...(recipient.whatsapp && { whatsapp: [{ channel: "whatsapp", number: recipient.whatsapp }] }),
-      ...(recipient.push && { push: [{ channel: "push", token: recipient.push }] }),
-    },
+    to,
     data,
   };
 
