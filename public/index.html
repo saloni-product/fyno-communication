@@ -183,7 +183,6 @@
             <th>Job ID</th>
             <th>Event</th>
             <th>Name</th>
-            <th>Consultation Link</th>
             <th>Recipient</th>
             <th>Notify At</th>
             <th>Target Time</th>
@@ -192,7 +191,7 @@
           </tr>
         </thead>
         <tbody id="schedule-tbody">
-          <tr class="empty-row"><td colspan="9">Loading…</td></tr>
+          <tr class="empty-row"><td colspan="8">Loading…</td></tr>
         </tbody>
       </table>
     </section>
@@ -209,7 +208,6 @@
             <th>Job ID</th>
             <th>Event</th>
             <th>Name</th>
-            <th>Consultation Link</th>
             <th>Recipient</th>
             <th>Target Time</th>
             <th>Status</th>
@@ -217,7 +215,7 @@
           </tr>
         </thead>
         <tbody id="log-tbody">
-          <tr class="empty-row"><td colspan="9">Loading…</td></tr>
+          <tr class="empty-row"><td colspan="8">Loading…</td></tr>
         </tbody>
       </table>
     </section>
@@ -251,12 +249,6 @@
       }
     }
 
-    function renderLink(url) {
-      if (!url) return '—';
-      const safe = url.replace(/"/g, '%22');
-      return `<a href="${safe}" target="_blank" rel="noopener">${url}</a>`;
-    }
-
     async function refresh() {
       try {
         const [schedulesRes, logsRes] = await Promise.all([
@@ -274,14 +266,13 @@
         const stbody = document.getElementById('schedule-tbody');
         document.getElementById('schedule-count').textContent = jobs.length;
         if (jobs.length === 0) {
-          stbody.innerHTML = `<tr class="empty-row"><td colspan="9">No active schedules</td></tr>`;
+          stbody.innerHTML = `<tr class="empty-row"><td colspan="8">No active schedules</td></tr>`;
         } else {
           stbody.innerHTML = jobs.map(j => `
             <tr>
               <td class="mono">${j.jobId}</td>
               <td>${j.eventName || '—'}</td>
-              <td>${j.name || '—'}</td>
-              <td>${renderLink(j.consultationLink)}</td>
+              <td>${j.name || '—'}${j.consultationLink ? `<br><a href="${j.consultationLink.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="font-size:0.75em;color:#6366f1">Consultation meet</a>` : ''}</td>
               <td>${j.distinctId || '—'}</td>
               <td>${fmt(j.notifyAt)}</td>
               <td>${fmt(j.targetTime)}</td>
@@ -295,15 +286,14 @@
         const ltbody = document.getElementById('log-tbody');
         document.getElementById('log-count').textContent = logs.length;
         if (logs.length === 0) {
-          ltbody.innerHTML = `<tr class="empty-row"><td colspan="9">No events yet</td></tr>`;
+          ltbody.innerHTML = `<tr class="empty-row"><td colspan="8">No events yet</td></tr>`;
         } else {
           ltbody.innerHTML = logs.map(l => `
             <tr>
               <td>${fmt(l.triggeredAt)}</td>
               <td class="mono">${l.jobId}</td>
               <td>${l.eventName || '—'}</td>
-              <td>${l.name || '—'}</td>
-              <td>${renderLink(l.consultationLink)}</td>
+              <td>${l.name || '—'}${l.consultationLink ? `<br><a href="${l.consultationLink.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="font-size:0.75em;color:#6366f1">Consultation meet</a>` : ''}</td>
               <td>${l.distinctId || '—'}</td>
               <td>${fmt(l.targetTime)}</td>
               <td>${statusPill(l.status)}</td>
