@@ -68,18 +68,19 @@ app.delete("/schedule/:jobId", (req, res) => {
   return res.json({ status: "cancelled", jobId: req.params.jobId });
 });
 
+// ─── GET /schedule/logs ───────────────────────────────────────────────────────
+// Return the event trigger history (success, failed, cancelled).
+// NOTE: must be defined before GET /schedule to avoid route shadowing.
+// ─────────────────────────────────────────────────────────────────────────────
+app.get("/schedule/logs", (req, res) => {
+  return res.json({ logs: getEventLogs() });
+});
+
 // ─── GET /schedule ────────────────────────────────────────────────────────────
 // List all active scheduled jobs.
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/schedule", (req, res) => {
   return res.json({ jobs: listJobs() });
-});
-
-// ─── GET /schedule/logs ───────────────────────────────────────────────────────
-// Return the event trigger history (success, failed, cancelled).
-// ─────────────────────────────────────────────────────────────────────────────
-app.get("/schedule/logs", (req, res) => {
-  return res.json({ logs: getEventLogs() });
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────

@@ -251,59 +251,73 @@
       }
     }
 
+    function renderLink(url) {
+      if (!url) return '—';
+      const safe = url.replace(/"/g, '%22');
+      return `<a href="${safe}" target="_blank" rel="noopener">${url}</a>`;
+    }
+
     async function refresh() {
-      const [schedulesRes, logsRes] = await Promise.all([
-        fetch('/schedule'),
-        fetch('/schedule/logs'),
-      ]);
+      try {
+        const [schedulesRes, logsRes] = await Promise.all([
+          fetch('/schedule'),
+          fetch('/schedule/logs'),
+        ]);
 
-      const { jobs }  = await schedulesRes.json();
-      const { logs }  = await logsRes.json();
+        if (!schedulesRes.ok) throw new Error(`GET /schedule failed: ${schedulesRes.status}`);
+        if (!logsRes.ok) throw new Error(`GET /schedule/logs failed: ${logsRes.status}`);
 
-      // Active schedules
-      const stbody = document.getElementById('schedule-tbody');
-      document.getElementById('schedule-count').textContent = jobs.length;
-      if (jobs.length === 0) {
-        stbody.innerHTML = `<tr class="empty-row"><td colspan="9">No active schedules</td></tr>`;
-      } else {
-        stbody.innerHTML = jobs.map(j => `
-          <tr>
-            <td class="mono">${j.jobId}</td>
-            <td>${j.eventName || '—'}</td>
-            <td>${j.name || '—'}</td>
-            <td>${j.consultationLink ? `<a href="${j.consultationLink}" target="_blank" rel="noopener">${j.consultationLink}</a>` : '—'}</td>
-            <td>${j.distinctId || '—'}</td>
-            <td>${fmt(j.notifyAt)}</td>
-            <td>${fmt(j.targetTime)}</td>
-            <td>${statusPill(j.status)}</td>
-            <td><button class="cancel-btn" onclick="cancelJob('${j.jobId}')">Cancel</button></td>
-          </tr>
-        `).join('');
+        const { jobs } = await schedulesRes.json();
+        const { logs } = await logsRes.json();
+
+        // Active schedules
+        const stbody = document.getElementById('schedule-tbody');
+        document.getElementById('schedule-count').textContent = jobs.length;
+        if (jobs.length === 0) {
+          stbody.innerHTML = `<tr class="empty-row"><td colspan="9">No active schedules</td></tr>`;
+        } else {
+          stbody.innerHTML = jobs.map(j => `
+            <tr>
+              <td class="mono">${j.jobId}</td>
+              <td>${j.eventName || '—'}</td>
+              <td>${j.name || '—'}</td>
+              <td>${renderLink(j.consultationLink)}</td>
+              <td>${j.distinctId || '—'}</td>
+              <td>${fmt(j.notifyAt)}</td>
+              <td>${fmt(j.targetTime)}</td>
+              <td>${statusPill(j.status)}</td>
+              <td><button class="cancel-btn" onclick="cancelJob('${j.jobId}')">Cancel</button></td>
+            </tr>
+          `).join('');
+        }
+
+        // Event logs
+        const ltbody = document.getElementById('log-tbody');
+        document.getElementById('log-count').textContent = logs.length;
+        if (logs.length === 0) {
+          ltbody.innerHTML = `<tr class="empty-row"><td colspan="9">No events yet</td></tr>`;
+        } else {
+          ltbody.innerHTML = logs.map(l => `
+            <tr>
+              <td>${fmt(l.triggeredAt)}</td>
+              <td class="mono">${l.jobId}</td>
+              <td>${l.eventName || '—'}</td>
+              <td>${l.name || '—'}</td>
+              <td>${renderLink(l.consultationLink)}</td>
+              <td>${l.distinctId || '—'}</td>
+              <td>${fmt(l.targetTime)}</td>
+              <td>${statusPill(l.status)}</td>
+              <td>${l.error ? `<span class="error-text">${l.error}</span>` : '—'}</td>
+            </tr>
+          `).join('');
+        }
+
+        document.getElementById('last-updated').textContent =
+          'Updated ' + new Date().toLocaleTimeString();
+      } catch (err) {
+        console.error('Dashboard refresh failed:', err);
+        document.getElementById('last-updated').textContent = 'Error: ' + err.message;
       }
-
-      // Event logs
-      const ltbody = document.getElementById('log-tbody');
-      document.getElementById('log-count').textContent = logs.length;
-      if (logs.length === 0) {
-        ltbody.innerHTML = `<tr class="empty-row"><td colspan="9">No events yet</td></tr>`;
-      } else {
-        ltbody.innerHTML = logs.map(l => `
-          <tr>
-            <td>${fmt(l.triggeredAt)}</td>
-            <td class="mono">${l.jobId}</td>
-            <td>${l.eventName || '—'}</td>
-            <td>${l.name || '—'}</td>
-            <td>${l.consultationLink ? `<a href="${l.consultationLink}" target="_blank" rel="noopener">${l.consultationLink}</a>` : '—'}</td>
-            <td>${l.distinctId || '—'}</td>
-            <td>${fmt(l.targetTime)}</td>
-            <td>${statusPill(l.status)}</td>
-            <td>${l.error ? `<span class="error-text">${l.error}</span>` : '—'}</td>
-          </tr>
-        `).join('');
-      }
-
-      document.getElementById('last-updated').textContent =
-        'Updated ' + new Date().toLocaleTimeString();
     }
 
     // Initial load + auto-refresh every 15 seconds
