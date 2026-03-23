@@ -1,8 +1,17 @@
 const schedule = require("node-schedule");
 const axios = require("axios");
 
-// In-memory store of scheduled jobs: { jobId -> { job, targetTime, notifyAt } }
+// In-memory store of scheduled jobs: { jobId -> { job, targetTime, notifyAt, eventName, distinctId } }
 const scheduledJobs = {};
+
+// In-memory event log (capped at 200 entries, newest first)
+const eventLogs = [];
+const MAX_LOGS = 200;
+
+function addLog(entry) {
+  eventLogs.unshift(entry);
+  if (eventLogs.length > MAX_LOGS) eventLogs.length = MAX_LOGS;
+}
 
 /**
  * Parse an ISO 8601 timestamp (e.g. "2026-03-21T10:00:00+00:00") and
@@ -32,23 +41,43 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
   const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const job = schedule.scheduleJob(jobId, notifyAt, async () => {
-    console.log(
-      `[${new Date().toISOString()}] Job ${jobId} triggered — sending Fyno notification`
-    );
+    const triggeredAt = new Date().toISOString();
+    console.log(`[${triggeredAt}] Job ${jobId} triggered — sending Fyno notification`);
     try {
       await sendFynoNotification(fynoConfig);
       console.log(`[${new Date().toISOString()}] Job ${jobId} — Fyno call succeeded`);
+      addLog({
+        jobId,
+        eventName: fynoConfig.eventName,
+        distinctId: fynoConfig.recipient?.distinct_id,
+        targetTime: targetTime.toISOString(),
+        triggeredAt,
+        status: "success",
+        error: null,
+      });
     } catch (err) {
-      console.error(
-        `[${new Date().toISOString()}] Job ${jobId} — Fyno call failed:`,
-        err.message
-      );
+      console.error(`[${new Date().toISOString()}] Job ${jobId} — Fyno call failed:`, err.message);
+      addLog({
+        jobId,
+        eventName: fynoConfig.eventName,
+        distinctId: fynoConfig.recipient?.distinct_id,
+        targetTime: targetTime.toISOString(),
+        triggeredAt,
+        status: "failed",
+        error: err.message,
+      });
     } finally {
       delete scheduledJobs[jobId];
     }
   });
 
-  scheduledJobs[jobId] = { job, targetTime, notifyAt };
+  scheduledJobs[jobId] = {
+    job,
+    targetTime,
+    notifyAt,
+    eventName: fynoConfig.eventName,
+    distinctId: fynoConfig.recipient?.distinct_id,
+  };
 
   console.log(
     `[${new Date().toISOString()}] Scheduled job ${jobId}: ` +
@@ -70,6 +99,15 @@ function cancelJob(jobId) {
   const entry = scheduledJobs[jobId];
   if (!entry) return false;
   entry.job.cancel();
+  addLog({
+    jobId,
+    eventName: entry.eventName,
+    distinctId: entry.distinctId,
+    targetTime: entry.targetTime.toISOString(),
+    triggeredAt: new Date().toISOString(),
+    status: "cancelled",
+    error: null,
+  });
   delete scheduledJobs[jobId];
   return true;
 }
@@ -78,11 +116,21 @@ function cancelJob(jobId) {
  * List all active scheduled jobs.
  */
 function listJobs() {
-  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt }]) => ({
+  return Object.entries(scheduledJobs).map(([jobId, { targetTime, notifyAt, eventName, distinctId }]) => ({
     jobId,
+    eventName,
+    distinctId,
     targetTime: targetTime.toISOString(),
     notifyAt: notifyAt.toISOString(),
+    status: "scheduled",
   }));
+}
+
+/**
+ * Return the event log history.
+ */
+function getEventLogs() {
+  return eventLogs;
 }
 
 /**
@@ -123,4 +171,4 @@ async function sendFynoNotification(fynoConfig) {
   return response.data;
 }
 
-module.exports = { scheduleHourBeforeNotification, cancelJob, listJobs };
+module.exports = { scheduleHourBeforeNotification, cancelJob, listJobs, getEventLogs };

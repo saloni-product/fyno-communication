@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fyno Scheduler Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #16213e;
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    #last-updated {
+      font-size: 0.78rem;
+      opacity: 0.6;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+
+    section {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 32px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 24px;
+      border-bottom: 1px solid #eef0f5;
+    }
+
+    .section-header h2 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge-blue  { background: #e8f0fe; color: #1a73e8; }
+    .badge-gray  { background: #f0f0f0; color: #666; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 24px;
+      background: #fafbfd;
+      font-weight: 600;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      border-bottom: 1px solid #eef0f5;
+    }
+
+    tbody td {
+      padding: 14px 24px;
+      border-bottom: 1px solid #f3f4f8;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #fafbfd; }
+
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.8rem;
+      color: #555;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-scheduled  { background: #e8f0fe; color: #1a73e8; }
+    .status-success    { background: #e6f4ea; color: #137333; }
+    .status-failed     { background: #fce8e6; color: #c5221f; }
+    .status-cancelled  { background: #f0f0f0; color: #666; }
+
+    .empty-row td {
+      text-align: center;
+      color: #aaa;
+      padding: 40px 24px;
+      font-size: 0.875rem;
+    }
+
+    .error-text {
+      color: #c5221f;
+      font-size: 0.78rem;
+      margin-top: 4px;
+    }
+
+    .cancel-btn {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      color: #c5221f;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .cancel-btn:hover { background: #fce8e6; border-color: #c5221f; }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      cursor: pointer;
+      color: #444;
+      transition: background 0.15s;
+    }
+
+    .refresh-btn:hover { background: #f0f0f0; }
+
+    .loading { opacity: 0.5; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fyno Scheduler Dashboard</h1>
+    <span id="last-updated">Loading…</span>
+  </header>
+
+  <main>
+    <!-- Active Schedules -->
+    <section>
+      <div class="section-header">
+        <h2>Active Schedules <span id="schedule-count" class="badge badge-blue">0</span></h2>
+        <button class="refresh-btn" onclick="refresh()">Refresh</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Job ID</th>
+            <th>Event</th>
+            <th>Recipient</th>
+            <th>Notify At</th>
+            <th>Target Time</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="schedule-tbody">
+          <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Event Log -->
+    <section>
+      <div class="section-header">
+        <h2>Event History <span id="log-count" class="badge badge-gray">0</span></h2>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Triggered At</th>
+            <th>Job ID</th>
+            <th>Event</th>
+            <th>Recipient</th>
+            <th>Target Time</th>
+            <th>Status</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody id="log-tbody">
+          <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <script>
+    function fmt(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    function statusPill(status) {
+      return `<span class="status-pill status-${status}">${status}</span>`;
+    }
+
+    async function cancelJob(jobId) {
+      if (!confirm(`Cancel job ${jobId}?`)) return;
+      try {
+        const res = await fetch(`/schedule/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const body = await res.json();
+          alert(body.error || 'Cancel failed');
+        }
+        await refresh();
+      } catch (e) {
+        alert('Network error: ' + e.message);
+      }
+    }
+
+    async function refresh() {
+      const [schedulesRes, logsRes] = await Promise.all([
+        fetch('/schedule'),
+        fetch('/schedule/logs'),
+      ]);
+
+      const { jobs }  = await schedulesRes.json();
+      const { logs }  = await logsRes.json();
+
+      // Active schedules
+      const stbody = document.getElementById('schedule-tbody');
+      document.getElementById('schedule-count').textContent = jobs.length;
+      if (jobs.length === 0) {
+        stbody.innerHTML = `<tr class="empty-row"><td colspan="7">No active schedules</td></tr>`;
+      } else {
+        stbody.innerHTML = jobs.map(j => `
+          <tr>
+            <td class="mono">${j.jobId}</td>
+            <td>${j.eventName || '—'}</td>
+            <td>${j.distinctId || '—'}</td>
+            <td>${fmt(j.notifyAt)}</td>
+            <td>${fmt(j.targetTime)}</td>
+            <td>${statusPill(j.status)}</td>
+            <td><button class="cancel-btn" onclick="cancelJob('${j.jobId}')">Cancel</button></td>
+          </tr>
+        `).join('');
+      }
+
+      // Event logs
+      const ltbody = document.getElementById('log-tbody');
+      document.getElementById('log-count').textContent = logs.length;
+      if (logs.length === 0) {
+        ltbody.innerHTML = `<tr class="empty-row"><td colspan="7">No events yet</td></tr>`;
+      } else {
+        ltbody.innerHTML = logs.map(l => `
+          <tr>
+            <td>${fmt(l.triggeredAt)}</td>
+            <td class="mono">${l.jobId}</td>
+            <td>${l.eventName || '—'}</td>
+            <td>${l.distinctId || '—'}</td>
+            <td>${fmt(l.targetTime)}</td>
+            <td>${statusPill(l.status)}</td>
+            <td>${l.error ? `<span class="error-text">${l.error}</span>` : '—'}</td>
+          </tr>
+        `).join('');
+      }
+
+      document.getElementById('last-updated').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    }
+
+    // Initial load + auto-refresh every 15 seconds
+    refresh();
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 const express = require("express");
-const { scheduleHourBeforeNotification, cancelJob, listJobs } = require("./scheduler");
+const path = require("path");
+const { scheduleHourBeforeNotification, cancelJob, listJobs, getEventLogs } = require("./scheduler");
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, "../public")));
 
 const PORT = process.env.PORT || 3000;
 
@@ -65,6 +67,13 @@ app.delete("/schedule/:jobId", (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/schedule", (req, res) => {
   return res.json({ jobs: listJobs() });
+});
+
+// ─── GET /schedule/logs ───────────────────────────────────────────────────────
+// Return the event trigger history (success, failed, cancelled).
+// ─────────────────────────────────────────────────────────────────────────────
+app.get("/schedule/logs", (req, res) => {
+  return res.json({ logs: getEventLogs() });
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
