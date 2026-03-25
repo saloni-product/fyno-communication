@@ -6,6 +6,31 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
+// Convert a UTC Date/ISO string to IST formatted { date, time }
+function toIST(isoString) {
+  const IST_OFFSET_MINUTES = 5 * 60 + 30;
+  const dt = new Date(isoString);
+  const ist = new Date(dt.getTime() + IST_OFFSET_MINUTES * 60000);
+
+  const ordinal = (d) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = d % 100;
+    return d + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  const hours = ist.getUTCHours();
+  const minutes = ist.getUTCMinutes();
+  const period = hours < 12 ? "AM" : "PM";
+  const displayHour = hours % 12 === 0 ? 12 : hours % 12;
+  const displayMinute = String(minutes).padStart(2, "0");
+
+  return {
+    date: `${ordinal(ist.getUTCDate())} ${monthNames[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`,
+    time: `${displayHour}:${displayMinute} ${period}`,
+  };
+}
+
 const PORT = process.env.PORT || 3000;
 
 // ─── POST /schedule ───────────────────────────────────────────────────────────
@@ -74,7 +99,12 @@ app.post("/schedule", (req, res) => {
       },
     };
     const result = scheduleHourBeforeNotification(timestamp, enrichedFyno);
-    return res.status(201).json(result);
+    return res.status(201).json({
+      jobId: result.jobId,
+      status: result.status,
+      targetTime: toIST(result.targetTime),
+      notifyAt: toIST(result.notifyAt),
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -127,31 +157,7 @@ app.post("/format-timestamp", (req, res) => {
     return res.status(400).json({ error: "Invalid timestamp format. Expected ISO 8601 (e.g. 2026-03-21T10:00:00+00:00)" });
   }
 
-  // Convert to IST (UTC+5:30)
-  const IST_OFFSET_MINUTES = 5 * 60 + 30;
-  const ist = new Date(dt.getTime() + IST_OFFSET_MINUTES * 60000);
-  const hours = ist.getUTCHours();
-  const minutes = ist.getUTCMinutes();
-  const day = ist.getUTCDate();
-  const month = ist.getUTCMonth();
-  const year = ist.getUTCFullYear();
-
-  const ordinal = (d) => {
-    const s = ["th", "st", "nd", "rd"];
-    const v = d % 100;
-    return d + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
-
-  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-  const period = hours < 12 ? "AM" : "PM";
-  const displayHour = hours % 12 === 0 ? 12 : hours % 12;
-  const displayMinute = String(minutes).padStart(2, "0");
-
-  return res.json({
-    date: `${ordinal(day)} ${monthNames[month]} ${year}`,
-    time: `${displayHour}:${displayMinute} ${period}`,
-  });
+  return res.json(toIST(timestamp));
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
