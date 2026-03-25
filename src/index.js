@@ -127,26 +127,14 @@ app.post("/format-timestamp", (req, res) => {
     return res.status(400).json({ error: "Invalid timestamp format. Expected ISO 8601 (e.g. 2026-03-21T10:00:00+00:00)" });
   }
 
-  // Extract parts using UTC values (preserve the timezone offset already applied)
-  const offsetMatch = timestamp.match(/([+-])(\d{2}):(\d{2})$/);
-  let hours, minutes, day, month, year;
-
-  if (offsetMatch) {
-    const sign = offsetMatch[1] === "+" ? 1 : -1;
-    const offsetMinutes = sign * (parseInt(offsetMatch[2]) * 60 + parseInt(offsetMatch[3]));
-    const local = new Date(dt.getTime() + offsetMinutes * 60000);
-    hours = local.getUTCHours();
-    minutes = local.getUTCMinutes();
-    day = local.getUTCDate();
-    month = local.getUTCMonth();
-    year = local.getUTCFullYear();
-  } else {
-    hours = dt.getUTCHours();
-    minutes = dt.getUTCMinutes();
-    day = dt.getUTCDate();
-    month = dt.getUTCMonth();
-    year = dt.getUTCFullYear();
-  }
+  // Convert to IST (UTC+5:30)
+  const IST_OFFSET_MINUTES = 5 * 60 + 30;
+  const ist = new Date(dt.getTime() + IST_OFFSET_MINUTES * 60000);
+  const hours = ist.getUTCHours();
+  const minutes = ist.getUTCMinutes();
+  const day = ist.getUTCDate();
+  const month = ist.getUTCMonth();
+  const year = ist.getUTCFullYear();
 
   const ordinal = (d) => {
     const s = ["th", "st", "nd", "rd"];
