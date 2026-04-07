@@ -183,7 +183,7 @@
             <th>Job ID</th>
             <th>Event</th>
             <th>Name</th>
-            <th>Recipient</th>
+            <th>WhatsApp</th>
             <th>Notify At</th>
             <th>Target Time</th>
             <th>Status</th>
@@ -208,7 +208,7 @@
             <th>Job ID</th>
             <th>Event</th>
             <th>Name</th>
-            <th>Recipient</th>
+            <th>WhatsApp</th>
             <th>Target Time</th>
             <th>Status</th>
             <th>Error</th>
@@ -273,7 +273,7 @@
               <td class="mono">${j.jobId}</td>
               <td>${j.eventName || '—'}</td>
               <td>${j.name || '—'}${j.consultationLink ? `<br><a href="${j.consultationLink.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="font-size:0.75em;color:#6366f1">Consultation meet</a>` : ''}</td>
-              <td>${j.distinctId || '—'}</td>
+              <td>${j.whatsapp || '—'}</td>
               <td>${fmt(j.notifyAt)}</td>
               <td>${fmt(j.targetTime)}</td>
               <td>${statusPill(j.status)}</td>
@@ -294,7 +294,7 @@
               <td class="mono">${l.jobId}</td>
               <td>${l.eventName || '—'}</td>
               <td>${l.name || '—'}${l.consultationLink ? `<br><a href="${l.consultationLink.replace(/"/g,'%22')}" target="_blank" rel="noopener" style="font-size:0.75em;color:#6366f1">Consultation meet</a>` : ''}</td>
-              <td>${l.distinctId || '—'}</td>
+              <td>${l.whatsapp || '—'}</td>
               <td>${fmt(l.targetTime)}</td>
               <td>${statusPill(l.status)}</td>
               <td>${l.error ? `<span class="error-text">${l.error}</span>` : '—'}</td>
