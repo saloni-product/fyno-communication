@@ -196,12 +196,11 @@
             <th>WhatsApp</th>
             <th>Notify At</th>
             <th>Target Time</th>
-            <th>Status</th>
             <th>Action</th>
           </tr>
         </thead>
         <tbody id="schedule-tbody">
-          <tr class="empty-row"><td colspan="8">Loading…</td></tr>
+          <tr class="empty-row"><td colspan="7">Loading…</td></tr>
         </tbody>
       </table>
       </div>
@@ -277,7 +276,7 @@
         const stbody = document.getElementById('schedule-tbody');
         document.getElementById('schedule-count').textContent = jobs.length;
         if (jobs.length === 0) {
-          stbody.innerHTML = `<tr class="empty-row"><td colspan="8">No active schedules</td></tr>`;
+          stbody.innerHTML = `<tr class="empty-row"><td colspan="7">No active schedules</td></tr>`;
         } else {
           stbody.innerHTML = jobs.map(j => `
             <tr>
@@ -287,7 +286,6 @@
               <td>${j.whatsapp || '—'}</td>
               <td>${fmt(j.notifyAt)}</td>
               <td>${fmt(j.targetTime)}</td>
-              <td>${statusPill(j.status)}</td>
               <td class="action-cell"><button class="cancel-btn" onclick="cancelJob('${j.jobId}')">Cancel</button></td>
             </tr>
           `).join('');
