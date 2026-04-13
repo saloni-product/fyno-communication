@@ -1,6 +1,6 @@
 const express = require("express");
 const path = require("path");
-const { scheduleHourBeforeNotification, cancelJob, listJobs, getEventLogs } = require("./scheduler");
+const { scheduleHourBeforeNotification, scheduleDayBeforeNotification, cancelJob, listJobs, getEventLogs } = require("./scheduler");
 
 const app = express();
 app.use(express.json());
@@ -99,6 +99,62 @@ app.post("/schedule", (req, res) => {
       },
     };
     const result = scheduleHourBeforeNotification(timestamp, enrichedFyno);
+    return res.status(201).json({
+      jobId: result.jobId,
+      status: result.status,
+      targetTime: toIST(result.targetTime),
+      notifyAt: toIST(result.notifyAt),
+    });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── POST /schedule/24h ───────────────────────────────────────────────────────
+// Schedule a Fyno notification 24 hours before the given timestamp (IST display).
+//
+// Request body:
+// {
+//   "timestamp": "2026-04-25T11:30:00+00:00",  // ISO 8601, must be >24h from now
+//   "name":      "Saloni",
+//   "fyno": {
+//     "apiKey":      "YOUR_FYNO_API_KEY",
+//     "workspaceId": "YOUR_WORKSPACE_ID",
+//     "eventName":   "your_event_name",
+//     "recipient": {
+//       "distinct_id": "7757855472",   // optional
+//       "whatsapp":    "7757855472",   // optional
+//       "email":       ""              // optional
+//     }
+//   }
+// }
+//
+// Response:
+// { "jobId": "...", "targetTime": "...", "notifyAt": "...", "status": "scheduled" }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/schedule/24h", (req, res) => {
+  const { timestamp, name, fyno } = req.body;
+
+  if (!timestamp) {
+    return res.status(400).json({ error: "timestamp is required" });
+  }
+  if (!fyno || !fyno.apiKey || !fyno.workspaceId || !fyno.eventName || !fyno.recipient) {
+    return res.status(400).json({
+      error: "fyno.apiKey, fyno.workspaceId, fyno.eventName, and fyno.recipient are required",
+    });
+  }
+
+  try {
+    const enrichedFyno = {
+      ...fyno,
+      data: {
+        name,
+        booking_date: formatBookingDate(timestamp),
+        booking_time: formatBookingTime(timestamp),
+        ...fyno.data,
+      },
+    };
+    const result = scheduleDayBeforeNotification(timestamp, enrichedFyno);
     return res.status(201).json({
       jobId: result.jobId,
       status: result.status,

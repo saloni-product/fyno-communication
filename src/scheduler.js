@@ -99,6 +99,91 @@ function scheduleHourBeforeNotification(timestamp, fynoConfig) {
 }
 
 /**
+ * Parse an ISO 8601 timestamp and schedule a Fyno API call exactly
+ * 24 hours before that time (computed in UTC; display is in IST).
+ *
+ * @param {string} timestamp   ISO 8601 datetime string
+ * @param {object} fynoConfig  { apiKey, workspaceId, eventName, recipient, data }
+ * @returns {{ jobId, targetTime, notifyAt, status }}
+ */
+function scheduleDayBeforeNotification(timestamp, fynoConfig) {
+  const targetTime = new Date(timestamp);
+
+  if (isNaN(targetTime.getTime())) {
+    throw new Error(`Invalid timestamp: "${timestamp}"`);
+  }
+
+  const notifyAt = new Date(targetTime.getTime() - 24 * 60 * 60 * 1000); // subtract 24 hours
+  const now = new Date();
+
+  if (notifyAt <= now) {
+    throw new Error(
+      `Notification time (${notifyAt.toISOString()}) is in the past. ` +
+        `Timestamp must be more than 24 hours from now.`
+    );
+  }
+
+  const jobId = `job_24h_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const job = schedule.scheduleJob(jobId, notifyAt, async () => {
+    const triggeredAt = new Date().toISOString();
+    console.log(`[${triggeredAt}] Job ${jobId} triggered — sending Fyno notification (24h nudge)`);
+    try {
+      await sendFynoNotification(fynoConfig);
+      console.log(`[${new Date().toISOString()}] Job ${jobId} — Fyno call succeeded`);
+      addLog({
+        jobId,
+        eventName: fynoConfig.eventName,
+        whatsapp: fynoConfig.recipient?.whatsapp,
+        name: fynoConfig.data?.name,
+        consultationLink: fynoConfig.data?.consultation_link,
+        targetTime: targetTime.toISOString(),
+        triggeredAt,
+        status: "success",
+        error: null,
+      });
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] Job ${jobId} — Fyno call failed:`, err.message);
+      addLog({
+        jobId,
+        eventName: fynoConfig.eventName,
+        whatsapp: fynoConfig.recipient?.whatsapp,
+        name: fynoConfig.data?.name,
+        consultationLink: fynoConfig.data?.consultation_link,
+        targetTime: targetTime.toISOString(),
+        triggeredAt,
+        status: "failed",
+        error: err.message,
+      });
+    } finally {
+      delete scheduledJobs[jobId];
+    }
+  });
+
+  scheduledJobs[jobId] = {
+    job,
+    targetTime,
+    notifyAt,
+    eventName: fynoConfig.eventName,
+    whatsapp: fynoConfig.recipient?.whatsapp,
+    name: fynoConfig.data?.name,
+    consultationLink: fynoConfig.data?.consultation_link,
+  };
+
+  console.log(
+    `[${new Date().toISOString()}] Scheduled 24h job ${jobId}: ` +
+      `target=${targetTime.toISOString()}, notify at=${notifyAt.toISOString()}`
+  );
+
+  return {
+    jobId,
+    targetTime: targetTime.toISOString(),
+    notifyAt: notifyAt.toISOString(),
+    status: "scheduled",
+  };
+}
+
+/**
  * Cancel a previously scheduled job by ID.
  */
 function cancelJob(jobId) {
@@ -159,6 +244,7 @@ async function sendFynoNotification(fynoConfig) {
   const url = `https://api.fyno.io/v1/${workspaceId}/event`;
 
   const to = {};
+  if (recipient.distinct_id) to.distinct_id = recipient.distinct_id;
   if (recipient.whatsapp) to.whatsapp = recipient.whatsapp;
   if (recipient.sms) to.sms = recipient.sms;
   if (recipient.email) to.email = recipient.email;
@@ -179,4 +265,4 @@ async function sendFynoNotification(fynoConfig) {
   return response.data;
 }
 
-module.exports = { scheduleHourBeforeNotification, cancelJob, listJobs, getEventLogs };
+module.exports = { scheduleHourBeforeNotification, scheduleDayBeforeNotification, cancelJob, listJobs, getEventLogs };
