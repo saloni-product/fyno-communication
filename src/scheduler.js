@@ -102,11 +102,19 @@ async function sendFynoNotification(fynoConfig) {
   if (recipient.sms) to.sms = recipient.sms;
   if (recipient.email) to.email = recipient.email;
 
-  const response = await axios.post(url, { event: eventName, to, data }, {
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-  });
+  const payload = { event: eventName, to, data };
+  console.log(`[Fyno] POST ${url} payload:`, JSON.stringify(payload));
 
-  return response.data;
+  try {
+    const response = await axios.post(url, payload, {
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    });
+    return response.data;
+  } catch (err) {
+    const fynoError = err.response?.data;
+    console.error(`[Fyno] Error ${err.response?.status}:`, JSON.stringify(fynoError));
+    throw new Error(fynoError ? JSON.stringify(fynoError) : err.message);
+  }
 }
 
 module.exports = { scheduleHourBeforeNotification, scheduleDayBeforeNotification, cancelJob, listJobs, getEventLogs };
