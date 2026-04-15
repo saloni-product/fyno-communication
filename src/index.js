@@ -8,6 +8,20 @@ app.use(express.static(path.join(__dirname, "../public")));
 
 const PORT = process.env.PORT || 3000;
 
+// Convert any ISO 8601 timestamp to IST-formatted { date, time }
+function toIST(isoString) {
+  const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+  const ist = new Date(new Date(isoString).getTime() + IST_OFFSET_MS);
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const day = ist.getUTCDate();
+  const ordinal = (d) => { const s = ["th","st","nd","rd"]; const v = d % 100; return d + (s[(v-20)%10] || s[v] || s[0]); };
+  const h = ist.getUTCHours(), m = ist.getUTCMinutes();
+  return {
+    date: `${ordinal(day)} ${MONTHS[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`,
+    time: `${h % 12 || 12}:${String(m).padStart(2,"0")} ${h < 12 ? "AM" : "PM"}`,
+  };
+}
+
 // Format "2026-03-24T15:00:00+05:30" → "24 Mar 2026"
 function formatBookingDate(isoString) {
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -62,7 +76,12 @@ app.post("/schedule", (req, res) => {
   const { timestamp, name, consultation_link, agent, fyno } = req.body;
   try {
     const result = scheduleHourBeforeNotification(timestamp, buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent }));
-    return res.status(201).json(result);
+    return res.status(201).json({
+      jobId: result.jobId,
+      status: result.status,
+      targetTime: toIST(result.targetTime),
+      notifyAt: toIST(result.notifyAt),
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -77,7 +96,12 @@ app.post("/schedule/24h", (req, res) => {
   const { timestamp, name, consultation_link, agent, fyno } = req.body;
   try {
     const result = scheduleDayBeforeNotification(timestamp, buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent }));
-    return res.status(201).json(result);
+    return res.status(201).json({
+      jobId: result.jobId,
+      status: result.status,
+      targetTime: toIST(result.targetTime),
+      notifyAt: toIST(result.notifyAt),
+    });
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -95,6 +119,19 @@ app.get("/schedule/logs", (req, res) => res.json({ logs: getEventLogs() }));
 
 // ─── GET /schedule ────────────────────────────────────────────────────────────
 app.get("/schedule", (req, res) => res.json({ jobs: listJobs() }));
+
+// ─── POST /format-timestamp ───────────────────────────────────────────────────
+// Convert an ISO 8601 timestamp to IST date and time.
+// Body:     { "timestamp": "2026-03-21T10:00:00+00:00" }
+// Response: { "date": "21st March 2026", "time": "3:30 PM" }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/format-timestamp", (req, res) => {
+  const { timestamp } = req.body;
+  if (!timestamp) return res.status(400).json({ error: "timestamp is required" });
+  const dt = new Date(timestamp);
+  if (isNaN(dt.getTime())) return res.status(400).json({ error: "Invalid timestamp format. Expected ISO 8601 (e.g. 2026-03-21T10:00:00+00:00)" });
+  return res.json(toIST(timestamp));
+});
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
