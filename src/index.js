@@ -6,57 +6,8 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Convert a UTC Date/ISO string to IST formatted { date, time }
-function toIST(isoString) {
-  const IST_OFFSET_MINUTES = 5 * 60 + 30;
-  const dt = new Date(isoString);
-  const ist = new Date(dt.getTime() + IST_OFFSET_MINUTES * 60000);
-
-  const ordinal = (d) => {
-    const s = ["th", "st", "nd", "rd"];
-    const v = d % 100;
-    return d + (s[(v - 20) % 10] || s[v] || s[0]);
-  };
-  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-  const hours = ist.getUTCHours();
-  const minutes = ist.getUTCMinutes();
-  const period = hours < 12 ? "AM" : "PM";
-  const displayHour = hours % 12 === 0 ? 12 : hours % 12;
-  const displayMinute = String(minutes).padStart(2, "0");
-
-  return {
-    date: `${ordinal(ist.getUTCDate())} ${monthNames[ist.getUTCMonth()]} ${ist.getUTCFullYear()}`,
-    time: `${displayHour}:${displayMinute} ${period}`,
-  };
-}
-
 const PORT = process.env.PORT || 3000;
 
-// ─── POST /schedule ───────────────────────────────────────────────────────────
-// Schedule a Fyno notification 1 hour before the given timestamp.
-//
-// Request body:
-// {
-//   "timestamp":         "2026-03-21T10:00:00+00:00",  // ISO 8601, must be >1h from now
-//   "name":              "John Doe",                    // passed to message template
-//   "consultation_link": "https://meet.example.com/x", // passed to message template
-//   "fyno": {
-//     "apiKey":      "YOUR_FYNO_API_KEY",
-//     "workspaceId": "YOUR_WORKSPACE_ID",
-//     "eventName":   "your_event_name",
-//     "recipient": {
-//       "whatsapp": "+917757855472",          // optional
-//       "sms":      "+1234567890",            // optional
-//       "email":    "user@example.com"        // optional
-//     },
-//     "data": { "key": "value" }              // optional extra template variables
-//   }
-// }
-//
-// Response:
-// { "jobId": "...", "targetTime": "...", "notifyAt": "...", "status": "scheduled" }
-// ─────────────────────────────────────────────────────────────────────────────
 // Format "2026-03-24T15:00:00+05:30" → "24 Mar 2026"
 function formatBookingDate(isoString) {
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -75,36 +26,81 @@ function formatBookingTime(isoString) {
   return `${h12}:${m[2]} ${ampm}`;
 }
 
-app.post("/schedule", (req, res) => {
-  const { timestamp, name, consultation_link, fyno } = req.body;
+// Build the enriched fyno config with all template variables
+function buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent }) {
+  return {
+    ...fyno,
+    data: {
+      name,
+      consultation_link,
+      agent,
+      booking_date: formatBookingDate(timestamp),
+      booking_time: formatBookingTime(timestamp),
+      ...fyno.data,
+    },
+  };
+}
 
+function validateScheduleBody(req, res) {
+  const { timestamp, fyno } = req.body;
   if (!timestamp) {
-    return res.status(400).json({ error: "timestamp is required" });
+    res.status(400).json({ error: "timestamp is required" });
+    return false;
   }
   if (!fyno || !fyno.apiKey || !fyno.workspaceId || !fyno.eventName || !fyno.recipient) {
-    return res.status(400).json({
+    res.status(400).json({
       error: "fyno.apiKey, fyno.workspaceId, fyno.eventName, and fyno.recipient are required",
     });
+    return false;
   }
+  return true;
+}
 
+// ─── POST /schedule ───────────────────────────────────────────────────────────
+// Schedule a Fyno notification 1 hour before the given timestamp.
+//
+// Request body:
+// {
+//   "timestamp":         "2026-03-21T10:00:00+00:00",
+//   "name":              "John Doe",
+//   "consultation_link": "https://meet.example.com/x",
+//   "agent":             "Dr. Smith",
+//   "fyno": {
+//     "apiKey":      "YOUR_FYNO_API_KEY",
+//     "workspaceId": "YOUR_WORKSPACE_ID",
+//     "eventName":   "1_hour_nudge",
+//     "recipient": { "whatsapp": "+917757855472" }
+//   }
+// }
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/schedule", (req, res) => {
+  if (!validateScheduleBody(req, res)) return;
+  const { timestamp, name, consultation_link, agent, fyno } = req.body;
   try {
-    const enrichedFyno = {
-      ...fyno,
-      data: {
-        name,
-        consultation_link,
-        booking_date: formatBookingDate(timestamp),
-        booking_time: formatBookingTime(timestamp),
-        ...fyno.data,
-      },
-    };
-    const result = scheduleHourBeforeNotification(timestamp, enrichedFyno);
-    return res.status(201).json({
-      jobId: result.jobId,
-      status: result.status,
-      targetTime: toIST(result.targetTime),
-      notifyAt: toIST(result.notifyAt),
-    });
+    const result = scheduleHourBeforeNotification(
+      timestamp,
+      buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent })
+    );
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+});
+
+// ─── POST /schedule/24h ───────────────────────────────────────────────────────
+// Schedule a Fyno notification 24 hours before the given timestamp.
+//
+// Same request body as POST /schedule — timestamp must be >24h from now.
+// ─────────────────────────────────────────────────────────────────────────────
+app.post("/schedule/24h", (req, res) => {
+  if (!validateScheduleBody(req, res)) return;
+  const { timestamp, name, consultation_link, agent, fyno } = req.body;
+  try {
+    const result = scheduleDayBeforeNotification(
+      timestamp,
+      buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent })
+    );
+    return res.status(201).json(result);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -167,8 +163,6 @@ app.post("/schedule/24h", (req, res) => {
 });
 
 // ─── DELETE /schedule/:jobId ──────────────────────────────────────────────────
-// Cancel a previously scheduled job.
-// ─────────────────────────────────────────────────────────────────────────────
 app.delete("/schedule/:jobId", (req, res) => {
   const cancelled = cancelJob(req.params.jobId);
   if (!cancelled) {
@@ -178,42 +172,13 @@ app.delete("/schedule/:jobId", (req, res) => {
 });
 
 // ─── GET /schedule/logs ───────────────────────────────────────────────────────
-// Return the event trigger history (success, failed, cancelled).
-// NOTE: must be defined before GET /schedule to avoid route shadowing.
-// ─────────────────────────────────────────────────────────────────────────────
 app.get("/schedule/logs", (req, res) => {
   return res.json({ logs: getEventLogs() });
 });
 
 // ─── GET /schedule ────────────────────────────────────────────────────────────
-// List all active scheduled jobs.
-// ─────────────────────────────────────────────────────────────────────────────
 app.get("/schedule", (req, res) => {
   return res.json({ jobs: listJobs() });
-});
-
-// ─── POST /format-timestamp ───────────────────────────────────────────────────
-// Format an ISO 8601 timestamp into a human-readable date and time.
-//
-// Request body:
-// { "timestamp": "2026-03-21T10:00:00+00:00" }
-//
-// Response:
-// { "date": "21st March 2026", "time": "10:00 AM" }
-// ─────────────────────────────────────────────────────────────────────────────
-app.post("/format-timestamp", (req, res) => {
-  const { timestamp } = req.body;
-
-  if (!timestamp) {
-    return res.status(400).json({ error: "timestamp is required" });
-  }
-
-  const dt = new Date(timestamp);
-  if (isNaN(dt.getTime())) {
-    return res.status(400).json({ error: "Invalid timestamp format. Expected ISO 8601 (e.g. 2026-03-21T10:00:00+00:00)" });
-  }
-
-  return res.json(toIST(timestamp));
 });
 
 // ─── Health check ─────────────────────────────────────────────────────────────
