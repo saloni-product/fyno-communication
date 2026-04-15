@@ -47,8 +47,8 @@ function buildEnrichedFyno(fyno, { timestamp, name, consultation_link, agent }) 
       name,
       consultation_link,
       agent,
-      booking_date: formatBookingDate(timestamp),
-      booking_time: formatBookingTime(timestamp),
+      date: formatBookingDate(timestamp),
+      time: formatBookingTime(timestamp),
       ...fyno.data,
     },
   };
